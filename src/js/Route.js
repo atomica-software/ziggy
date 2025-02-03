@@ -77,15 +77,19 @@ export default class Route {
     matchesUrl(url) {
         if (!this.definition.methods.includes('GET')) return false;
 
+        // Store parameter names in order of appearance
+        const paramNames = [];
+
         // Transform the route's template into a regex that will match a hydrated URL,
         // by replacing its parameter segments with matchers for parameter values
         const pattern = this.template
             .replace(/[.*+$()[\]]/g, '\\$&')
             .replace(/(\/?){([^}?]*)(\??)}/g, (_, slash, segment, optional) => {
-                const regex = `(?<${segment}>${
+                paramNames.push(segment); // Store the parameter name
+                const regex = `(${
                     this.wheres[segment]?.replace(/(^\^)|(\$$)/g, '') || '[^/?]+'
                 })`;
-                return optional ? `(${slash}${regex})?` : `${slash}${regex}`;
+                return optional ? `(?:${slash}${regex})?` : `${slash}${regex}`;
             })
             .replace(/^\w+:\/\//, '');
 
@@ -96,13 +100,16 @@ export default class Route {
             new RegExp(`^${pattern}/?$`).exec(decodeURI(location));
 
         if (matches) {
-            for (const k in matches.groups) {
-                matches.groups[k] =
-                    typeof matches.groups[k] === 'string'
-                        ? decodeURIComponent(matches.groups[k])
-                        : matches.groups[k];
+            // Build params object manually using the stored parameter names
+            const params = {};
+            // Start from index 1 to skip the full match at index 0
+            for (let i = 0; i < paramNames.length; i++) {
+                const value = matches[i + 1];
+                params[paramNames[i]] = typeof value === 'string'
+                    ? decodeURIComponent(value)
+                    : value;
             }
-            return { params: matches.groups, query: parse(query) };
+            return { params, query: parse(query) };
         }
 
         return false;
