@@ -75,44 +75,49 @@ export default class Route {
      * @return {Object|false} - If this route matches, returns the matched parameters.
      */
     matchesUrl(url) {
-        if (!this.definition.methods.includes('GET')) return false;
+        try {
+            if (!this.definition.methods.includes('GET')) return false;
 
-        // Store parameter names in order of appearance
-        const paramNames = [];
+            // Store parameter names in order of appearance
+            const paramNames = [];
 
-        // Transform the route's template into a regex that will match a hydrated URL,
-        // by replacing its parameter segments with matchers for parameter values
-        const pattern = this.template
-            .replace(/[.*+$()[\]]/g, '\\$&')
-            .replace(/(\/?){([^}?]*)(\??)}/g, (_, slash, segment, optional) => {
-                paramNames.push(segment); // Store the parameter name
-                const regex = `(${
-                    this.wheres[segment]?.replace(/(^\^)|(\$$)/g, '') || '[^/?]+'
-                })`;
-                return optional ? `(?:${slash}${regex})?` : `${slash}${regex}`;
-            })
-            .replace(/^\w+:\/\//, '');
+            // Transform the route's template into a regex that will match a hydrated URL,
+            // by replacing its parameter segments with matchers for parameter values
+            const pattern = this.template
+                .replace(/[.*+$()[\]]/g, '\\$&')
+                .replace(/(\/?){([^}?]*)(\??)}/g, (_, slash, segment, optional) => {
+                    paramNames.push(segment); // Store the parameter name
+                    const regex = `(${
+                        this.wheres[segment]?.replace(/(^\^)|(\$$)/g, '') || '[^/?]+'
+                    })`;
+                    return optional ? `(?:${slash}${regex})?` : `${slash}${regex}`;
+                })
+                .replace(/^\w+:\/\//, '');
 
-        const [location, query] = url.replace(/^\w+:\/\//, '').split('?');
+            const [location, query] = url.replace(/^\w+:\/\//, '').split('?');
 
-        const matches =
-            new RegExp(`^${pattern}/?$`).exec(location) ??
-            new RegExp(`^${pattern}/?$`).exec(decodeURI(location));
+            const matches =
+                new RegExp(`^${pattern}/?$`).exec(location) ??
+                new RegExp(`^${pattern}/?$`).exec(decodeURI(location));
 
-        if (matches) {
-            // Build params object manually using the stored parameter names
-            const params = {};
-            // Start from index 1 to skip the full match at index 0
-            for (let i = 0; i < paramNames.length; i++) {
-                const value = matches[i + 1];
-                params[paramNames[i]] = typeof value === 'string'
-                    ? decodeURIComponent(value)
-                    : value;
+            if (matches) {
+                // Build params object manually using the stored parameter names
+                const params = {};
+                // Start from index 1 to skip the full match at index 0
+                for (let i = 0; i < paramNames.length; i++) {
+                    const value = matches[i + 1];
+                    params[paramNames[i]] = typeof value === 'string'
+                        ? decodeURIComponent(value)
+                        : value;
+                }
+                return { params, query: parse(query) };
             }
-            return { params, query: parse(query) };
-        }
 
-        return false;
+            return false;
+        } catch (error) {
+            console.error('Ziggy matchesUrl error:', error);
+            return false;
+        }
     }
 
     /**
